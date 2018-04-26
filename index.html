@@ -19,7 +19,8 @@
 	html, body {
 		width: 100%;
 		height: 100%;
-		overflow: hidden;;
+		overflow: hidden;
+		position: fixed;
 	}
 	.overlay {
 		position: sticky; 
@@ -177,7 +178,7 @@
 
 		var loader = new THREE.FBXLoader(manager);
 		//loader.load( 'models/fbx/samoletche binary.fbx', function ( object ) {
-			loader.load( 'src/samoletche12.fbx', function ( object ) {
+			loader.load( 'models/samoletche13.fbx', function ( object ) {
 				console.log("in loader.load")
 				console.log(object)
 				
@@ -205,21 +206,16 @@
 					} else if (child.name == "Body") {
 						onRenderFcts.push(function(){
 							if (isTouching) {
-								child.position.x +=0.01 * directionIsLeft;
+								//child.position.x += startX * .1;
+								if (speedX > 0) {
+									child.position.x -= 0.01;
+								} else {
+									child.position.x += 0.01;
+								}
 							}
-
 						});	
 					}
-
 				}
-				// if (child.name == "Plane") {
-				// 	onRenderFcts.push(function(){
-				// 		if (isTouching) {
-				// 			child.position.x +=0.01;
-				// 		}
-
-				// 	});	
-				// }
 
 			} );						
 
@@ -295,25 +291,28 @@
 		    object.rotation.setFromRotationMatrix(object.matrix);
 		}
 
-		var directionIsLeft = 1;
+		var speedX;
 		var isTouching = false;
-		window.addEventListener('touchstart', function() {
+		var startX = 0;		
+
+		window.addEventListener('touchstart', function(e) {
 			isTouching = true;
+		    startX = e.touches[0].clientX;
 		});
+
+		window.addEventListener('touchmove', function(e) {
+		    var te = e.changedTouches[0].clientX;		    
+	        speedX = startX - te;
+	        console.log(speedX);
+		    startX = te;
+		});
+
 		window.addEventListener('touchend', function() {
 			isTouching = false;
 			directionIsLeft *= -1;
 		});
-		window.addEventListener('keypress', function() {
-			isTouching = true;
-		});
-		window.addEventListener('keyup', function() {
-			isTouching = false;		
-			directionIsLeft *= -1;
-		});
-	</script>
-	<div class="overlay">
 
-	</div>
+
+</script>
 </body>
 </html>
