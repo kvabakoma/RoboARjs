@@ -2,6 +2,7 @@
 <html>
 <head>	
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<meta charset="UTF-8">
 
 	<script src='src/three.min.js'></script>
 	<script src="src/stats.min.js"></script>
@@ -9,15 +10,32 @@
 
 	<script src="src/inflate.min.js"></script>
 	<script src="src/FBXLoader.js"></script>
-	<script src="src/OrbitControls.js"></script>
-	<script src="src/Detector.js"></script>
+	<!-- <script src="src/Detector.js"></script> -->
 
 	<script>THREEx.ArToolkitContext.baseURL = 'ar/'</script>
 
 	<title>ROBO</title>
+	<style>
+	html, body {
+		width: 100%;
+		height: 100%;
+		overflow: hidden;;
+	}
+	.overlay {
+		position: sticky; 
+		left: 0px; 
+		top: 0px; 
+		width: 100%; 
+		height: 100%; 
+		z-index: 100; 
+		background-color: #ffffff88;
+		overflow: hidden;
+	}
+</style>
 </head>
 <body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
 	<script>
+
 		//////////////////////////////////////////////////////////////////////////////////
 		//		Init
 		//////////////////////////////////////////////////////////////////////////////////
@@ -54,16 +72,7 @@
 		////////////////////////////////////////////////////////////////////////////////
 
 		var arToolkitSource = new THREEx.ArToolkitSource({
-			// to read from the webcam 
 			sourceType : 'webcam',
-
-			// to read from an image
-			// sourceType : 'image',
-			// sourceUrl : THREEx.ArToolkitContext.baseURL + '../data/images/img.jpg',		
-
-			// to read from a video
-			// sourceType : 'video',
-			// sourceUrl : THREEx.ArToolkitContext.baseURL + '../data/videos/headtracking.mp4',		
 		})
 
 		arToolkitSource.init(function onReady(){
@@ -75,10 +84,10 @@
 			onResize()
 		})
 		function onResize(){
-			arToolkitSource.onResize()	
-			arToolkitSource.copySizeTo(renderer.domElement)	
+			arToolkitSource.onResizeElement()	
+			arToolkitSource.copyElementSizeTo(renderer.domElement)	
 			if( arToolkitContext.arController !== null ){
-				arToolkitSource.copySizeTo(arToolkitContext.arController.canvas)	
+				arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
 			}	
 		}
 		////////////////////////////////////////////////////////////////////////////////
@@ -116,8 +125,8 @@
 		scene.add(markerRoot)
 		var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
 			type : 'pattern',
-			patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.hiro'
-			//patternUrl : THREEx.ArToolkitContext.baseURL + 'marker-robo-bw.patt'
+			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.hiro'
+			patternUrl : THREEx.ArToolkitContext.baseURL + 'marker-robo-2.patt'
 			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.kanji'
 		})
 		console.log("path = " +  THREEx.ArToolkitContext.baseURL);
@@ -150,47 +159,28 @@
 		scene.add( light );
 
 		var arWorldRoot = smoothedRoot
-		/*
-		// add a torus knot	
-		var geometry	= new THREE.CubeGeometry(1,1,1);
-		var material	= new THREE.MeshNormalMaterial({
-			transparent : true,
-			opacity: 0.5,
-			side: THREE.DoubleSide
-		}); 
-		var mesh	= new THREE.Mesh( geometry, material );
-		mesh.position.y	= geometry.parameters.height/2
-		arWorldRoot.add( mesh );
-		
-		var geometry	= new THREE.TorusKnotGeometry(0.3,0.1,64,16);
-		var material	= new THREE.MeshNormalMaterial(); 
-		var mesh	= new THREE.Mesh( geometry, material );
-		mesh.position.y	= 0.5
-		arWorldRoot.add( mesh );
-		
-		onRenderFcts.push(function(){
-			mesh.rotation.x += 0.1
-		})*/
 
 		// model
 		var manager = new THREE.LoadingManager();
 		manager.onStart = function ( url, itemsLoaded, itemsTotal ) {
-			console.log( 'Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
+			//console.log( 'Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
 		};
 		manager.onLoad = function ( ) {
 			console.log( 'Loading complete!');
 		};
 		manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
-			console.log( 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
+			//console.log( 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
 		};
 		manager.onError = function ( url ) {
 			console.log( 'There was an error loading ' + url );
 		};
+
 		var loader = new THREE.FBXLoader(manager);
 		//loader.load( 'models/fbx/samoletche binary.fbx', function ( object ) {
-			loader.load( 'src/samoletche9.fbx', function ( object ) {
+			loader.load( 'src/samoletche12.fbx', function ( object ) {
 				console.log("in loader.load")
 				console.log(object)
+				
 			/*
 			object.mixer = new THREE.AnimationMixer( object );
 			mixers.push( object.mixer );
@@ -205,15 +195,31 @@
 					child.castShadow = true;
 					child.receiveShadow = true;
 					console.log(child.name);
-					console.log(child);
+					//console.log(child);
 
 					if (child.name == "Perki")
 					{
 						onRenderFcts.push(function(){
 							child.rotation.z += 0.2
-						});
+						});						
+					} else if (child.name == "Body") {
+						onRenderFcts.push(function(){
+							if (isTouching) {
+								child.position.x +=0.01 * directionIsLeft;
+							}
+
+						});	
 					}
+
 				}
+				// if (child.name == "Plane") {
+				// 	onRenderFcts.push(function(){
+				// 		if (isTouching) {
+				// 			child.position.x +=0.01;
+				// 		}
+
+				// 	});	
+				// }
 
 			} );						
 
@@ -245,6 +251,69 @@
 				onRenderFct(deltaMsec/1000, nowMsec/1000)
 			})
 		})
+
+
+
+		// HELPER FUNCTIONS
+		// Rotate an object around an arbitrary axis in object space
+		var rotObjectMatrix;
+		function rotateAroundObjectAxis(object, axis, radians) {
+			rotObjectMatrix = new THREE.Matrix4();
+			rotObjectMatrix.makeRotationAxis(axis.normalize(), radians);
+
+		    // old code for Three.JS pre r54:
+		    // object.matrix.multiplySelf(rotObjectMatrix);      // post-multiply
+		    // new code for Three.JS r55+:
+		    object.matrix.multiply(rotObjectMatrix);
+
+		    // old code for Three.js pre r49:
+		    // object.rotation.getRotationFromMatrix(object.matrix, object.scale);
+		    // old code for Three.js r50-r58:
+		    // object.rotation.setEulerFromRotationMatrix(object.matrix);
+		    // new code for Three.js r59+:
+		    object.rotation.setFromRotationMatrix(object.matrix);
+		}
+
+		var rotWorldMatrix;
+		// Rotate an object around an arbitrary axis in world space       
+		function rotateAroundWorldAxis(object, axis, radians) {
+			rotWorldMatrix = new THREE.Matrix4();
+			rotWorldMatrix.makeRotationAxis(axis.normalize(), radians);
+
+		    // old code for Three.JS pre r54:
+		    //  rotWorldMatrix.multiply(object.matrix);
+		    // new code for Three.JS r55+:
+		    rotWorldMatrix.multiply(object.matrix);                // pre-multiply
+
+		    object.matrix = rotWorldMatrix;
+
+		    // old code for Three.js pre r49:
+		    // object.rotation.getRotationFromMatrix(object.matrix, object.scale);
+		    // old code for Three.js pre r59:
+		    // object.rotation.setEulerFromRotationMatrix(object.matrix);
+		    // code for r59+:
+		    object.rotation.setFromRotationMatrix(object.matrix);
+		}
+
+		var directionIsLeft = 1;
+		var isTouching = false;
+		window.addEventListener('touchstart', function() {
+			isTouching = true;
+		});
+		window.addEventListener('touchend', function() {
+			isTouching = false;
+			directionIsLeft *= -1;
+		});
+		window.addEventListener('keypress', function() {
+			isTouching = true;
+		});
+		window.addEventListener('keyup', function() {
+			isTouching = false;		
+			directionIsLeft *= -1;
+		});
 	</script>
+	<div class="overlay">
+
+	</div>
 </body>
 </html>
