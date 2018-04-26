@@ -178,7 +178,7 @@
 
 		var loader = new THREE.FBXLoader(manager);
 		//loader.load( 'models/fbx/samoletche binary.fbx', function ( object ) {
-			loader.load( 'models/samoletche13.fbx', function ( object ) {
+			loader.load( 'models/samoletche14.fbx', function ( object ) {
 				console.log("in loader.load")
 				console.log(object)
 				
@@ -189,6 +189,16 @@
 			var action = object.mixer.clipAction( object.animations[ 0 ] );
 			action.play();
 			*/
+
+			onRenderFcts.push(function(){
+				if (isTouching) {
+					if (speedX > 0) {
+						object.position.x -= 0.01;
+					} else {
+						object.position.x += 0.01;
+					}
+				}
+			});	
 			object.traverse( function ( child ) {
 
 				if ( child.isMesh ) {
@@ -196,7 +206,6 @@
 					child.castShadow = true;
 					child.receiveShadow = true;
 					console.log(child.name);
-					//console.log(child);
 
 					if (child.name == "Perki")
 					{
@@ -206,11 +215,10 @@
 					} else if (child.name == "Body") {
 						onRenderFcts.push(function(){
 							if (isTouching) {
-								//child.position.x += startX * .1;
 								if (speedX > 0) {
-									child.position.x -= 0.01;
+									object.rotation.z += 0.02;
 								} else {
-									child.position.x += 0.01;
+									object.rotation.z -= 0.02;
 								}
 							}
 						});	
@@ -303,7 +311,7 @@
 		window.addEventListener('touchmove', function(e) {
 		    var te = e.changedTouches[0].clientX;		    
 	        speedX = startX - te;
-	        console.log(speedX);
+	        speedX = clamp(speedX,-10,10);
 		    startX = te;
 		});
 
@@ -311,6 +319,10 @@
 			isTouching = false;
 			directionIsLeft *= -1;
 		});
+
+		function clamp(num, min, max) {
+		  return num <= min ? min : num >= max ? max : num;
+		}
 
 
 </script>
