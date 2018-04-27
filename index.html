@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>	
+	<script type="text/javascript">
+		if (location.protocol != 'https:')
+		{
+			location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
+		}		
+	</script>
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 	<meta charset="UTF-8">
 
@@ -10,6 +16,7 @@
 
 	<script src="src/inflate.min.js"></script>
 	<script src="src/FBXLoader.js"></script>
+	<!-- https://threejs.org/docs/#manual/introduction/WebGL-compatibility-check -->
 	<!-- <script src="src/Detector.js"></script> -->
 
 	<script>THREEx.ArToolkitContext.baseURL = 'ar/'</script>
@@ -42,8 +49,8 @@
 		//////////////////////////////////////////////////////////////////////////////////
 
 		// init renderer
-		var renderer	= new THREE.WebGLRenderer({
-			antialias	: true,
+		var renderer = new THREE.WebGLRenderer({
+			antialias: true,
 			alpha: true
 		});
 		renderer.setClearColor(new THREE.Color('lightgrey'), 0)
@@ -91,10 +98,10 @@
 				arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
 			}	
 		}
+
 		////////////////////////////////////////////////////////////////////////////////
 		//          initialize arToolkitContext
-		////////////////////////////////////////////////////////////////////////////////
-		
+		////////////////////////////////////////////////////////////////////////////////		
 
 		// create atToolkitContext
 		var arToolkitContext = new THREEx.ArToolkitContext({
@@ -126,11 +133,10 @@
 		scene.add(markerRoot)
 		var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
 			type : 'pattern',
-			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.hiro'
 			patternUrl : THREEx.ArToolkitContext.baseURL + 'marker-robo-2.patt'
+			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.hiro'			
 			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.kanji'
 		})
-		console.log("path = " +  THREEx.ArToolkitContext.baseURL);
 
 		// build a smoothedControls
 		var smoothedRoot = new THREE.Group()
@@ -143,23 +149,30 @@
 		onRenderFcts.push(function(delta){
 			smoothedControls.update(markerRoot)
 		})
+
+		var arWorldRoot = smoothedRoot
+
+
 		//////////////////////////////////////////////////////////////////////////////////
-		//		add an object in the scene
+		//		add LIGHTS in the scene
 		//////////////////////////////////////////////////////////////////////////////////
 
 		var light = new THREE.AmbientLight( 0x222222, 4.3 ); // soft white light
-		scene.add( light );
+		arWorldRoot.add( light );
 
 		var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
 		directionalLight.castShadow = true;
 		directionalLight.position = (5,10,7.5)
-		scene.add( directionalLight );
-
+		arWorldRoot.add( directionalLight );
+		
 		light = new THREE.HemisphereLight( 0xffffff, 0x444444 );
 		light.position.set( 0, 200, 0 );
-		scene.add( light );
+		light.castShadow = true;
+		arWorldRoot.add( light );
 
-		var arWorldRoot = smoothedRoot
+		//////////////////////////////////////////////////////////////////////////////////
+		//		add THE PLANE in the scene
+		//////////////////////////////////////////////////////////////////////////////////		
 
 		// model
 		var manager = new THREE.LoadingManager();
@@ -177,28 +190,37 @@
 		};
 
 		var loader = new THREE.FBXLoader(manager);
-		//loader.load( 'models/fbx/samoletche binary.fbx', function ( object ) {
-			loader.load( 'models/samoletche14.fbx', function ( object ) {
-				console.log("in loader.load")
-				console.log(object)
-				
-			/*
-			object.mixer = new THREE.AnimationMixer( object );
-			mixers.push( object.mixer );
+		loader.load( 'models/samoletche14.fbx', function ( object ) {
 
-			var action = object.mixer.clipAction( object.animations[ 0 ] );
-			action.play();
-			*/
-
+			// BIND MOVEMENT CONTROLS
 			onRenderFcts.push(function(){
 				if (isTouching) {
-					if (speedX > 0) {
-						object.position.x -= 0.01;
-					} else {
+					if (speedX > .5 || speedX < -.5) {
+						object.position.x -= 0.01 * speedX;						
+					}		
+					if (speedY > .5 || speedY < -.5) {
+						object.position.z -= 0.01 * speedY;
+					}		
+
+					if (Math.abs(object.position.x) > Math.abs(2)) {
+						object.position.x += 0.03 * speedX;
+					}	
+
+					if (object.position.z > 0 || object.position.z < -4) {
+						object.position.z += 0.03 * speedY;
+					}
+
+					console.log(object.position.z);
+					/*
+					if (speedX > .5) {
+						object.position.x -= 0.01;						
+					} else if (speedX < -.5) {
 						object.position.x += 0.01;
 					}
+					*/
 				}
 			});	
+
 			object.traverse( function ( child ) {
 
 				if ( child.isMesh ) {
@@ -209,17 +231,22 @@
 
 					if (child.name == "Perki")
 					{
+						// ROTATE THE PROPELLER
 						onRenderFcts.push(function(){
 							child.rotation.z += 0.2
-						});						
+						});		
+
 					} else if (child.name == "Body") {
+						// BIND ROTATION CONTROLS
 						onRenderFcts.push(function(){
 							if (isTouching) {
 								if (speedX > 0) {
-									object.rotation.z += 0.02;
-								} else {
-									object.rotation.z -= 0.02;
+									object.rotation.z = .25;									
+								} else if (speedX < 0) {
+									object.rotation.z = -.25;
 								}
+							} else {
+								object.rotation.z = 0;
 							}
 						});	
 					}
@@ -299,32 +326,40 @@
 		    object.rotation.setFromRotationMatrix(object.matrix);
 		}
 
-		var speedX;
+		var speedX, speedY;
 		var isTouching = false;
-		var startX = 0;		
+		var startX = 0, startY = 0;		
+		var currentX = 0, currentY = 0;
 
 		window.addEventListener('touchstart', function(e) {
 			isTouching = true;
-		    startX = e.touches[0].clientX;
+			startX = e.touches[0].clientX;
+			currentX = startX;
+			startY = e.touches[0].clientY;
+			currentY = startY;
 		});
 
 		window.addEventListener('touchmove', function(e) {
-		    var te = e.changedTouches[0].clientX;		    
-	        speedX = startX - te;
-	        speedX = clamp(speedX,-10,10);
-		    startX = te;
+			currentX = e.changedTouches[0].clientX;		    
+			speedX = startX - currentX;
+			speedX = clamp(speedX,-10,10);
+			startX = currentX;
+
+			currentY = e.changedTouches[0].clientY;		    
+			speedY = startY - currentY;
+			speedY = clamp(speedY,-10,10);
+			startY = currentY;
 		});
 
 		window.addEventListener('touchend', function() {
 			isTouching = false;
-			directionIsLeft *= -1;
 		});
 
 		function clamp(num, min, max) {
-		  return num <= min ? min : num >= max ? max : num;
+			return num <= min ? min : num >= max ? max : num;
 		}
 
 
-</script>
+	</script>
 </body>
 </html>
