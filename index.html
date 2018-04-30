@@ -2,374 +2,441 @@
 <html>
 <head>	
 	<script type="text/javascript">
-		// if (location.protocol != 'https:')
-		// {
-			// 	if ( location.protocol != "file:///") {
-				// 		location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
-				// 	}
-				// }		
-			</script>
-			<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-			<meta charset="UTF-8">
+		if (location.protocol != 'https:')
+		{
+			if ( location.protocol != "file:///") {
+				//location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
+			}
+		}		
+	</script>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<meta charset="UTF-8">
+	
+	<script src='src/three.min.js'></script>
+	<script src="src/stats.min.js"></script>
+	<script src="src/ar.min.js"></script>
+	
+	<script src="src/inflate.min.js"></script>
+	<script src="src/FBXLoader.js"></script>
+	<!-- <script src="src/HDRCubeTextureLoader.js"></script> -->
+	<!-- https://threejs.org/docs/#manual/introduction/WebGL-compatibility-check -->
+	<!-- <script src="src/Detector.js"></script> -->
+	
+	<script>THREEx.ArToolkitContext.baseURL = 'ar/'</script>
+	
+	<title>ROBO</title>
+	<style>
+		html, body {
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			position: fixed;
+			margin: 0px;
+			padding: 0px;
+		}
+	</style>
+</head>
+<body>
+	<script>
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		Init
+		//////////////////////////////////////////////////////////////////////////////////
+		
+		// init renderer
+		var renderer = new THREE.WebGLRenderer({
+			antialias: true,
+			alpha: true,
+			shadowMap: true
+		});
+		renderer.setClearColor(new THREE.Color('lightgrey'), 0)
+		// renderer.setPixelRatio( 1/2 );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		renderer.domElement.style.position = 'absolute'
+		renderer.domElement.style.top = '0px'
+		renderer.domElement.style.left = '0px'
+		document.body.appendChild( renderer.domElement );
+		
+		// array of functions for the rendering loop
+		var onRenderFcts= [];
+		
+		// init scene and camera
+		var scene = new THREE.Scene();				
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		Initialize a basic camera
+		//////////////////////////////////////////////////////////////////////////////////
+		
+		// Create a camera
+		// var camera = new THREE.Camera();
+		var camera = new THREE.OrthographicCamera();
+		scene.add(camera);
+		
+		////////////////////////////////////////////////////////////////////////////////
+		//          handle arToolkitSource
+		////////////////////////////////////////////////////////////////////////////////
+		
+		var arToolkitSource = new THREEx.ArToolkitSource({
+			sourceType : 'webcam',
+		})
+		
+		arToolkitSource.init(function onReady(){
+			onResize()
+		})
+		
+		// handle resize
+		window.addEventListener('resize', function(){
+			onResize()
+		})
+		function onResize(){
+			arToolkitSource.onResizeElement()	
+			arToolkitSource.copyElementSizeTo(renderer.domElement)	
+			if( arToolkitContext.arController !== null ){
+				arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
+			}	
+		}
+		
+		////////////////////////////////////////////////////////////////////////////////
+		//          initialize arToolkitContext
+		////////////////////////////////////////////////////////////////////////////////		
+		
+		// create atToolkitContext
+		var arToolkitContext = new THREEx.ArToolkitContext({
+			cameraParametersUrl: THREEx.ArToolkitContext.baseURL + 'camera_para.dat',
+			detectionMode: 'mono',
+			maxDetectionRate: 30,
+			canvasWidth: 80*3,
+			canvasHeight: 60*3,
+		})
+		// initialize it
+		arToolkitContext.init(function onCompleted(){
+			// copy projection matrix to camera
+			camera.projectionMatrix.copy( arToolkitContext.getProjectionMatrix() );
+		})
+		
+		// update artoolkit on every frame
+		onRenderFcts.push(function(){
+			if( arToolkitSource.ready === false )	return
 			
-			<script src='src/three.min.js'></script>
-			<script src="src/stats.min.js"></script>
-			<script src="src/ar.min.js"></script>
+			arToolkitContext.update( arToolkitSource.domElement )
+		})
+		
+		
+		////////////////////////////////////////////////////////////////////////////////
+		//          Create a ArMarkerControls
+		////////////////////////////////////////////////////////////////////////////////
+		
+		var markerRoot = new THREE.Group
+		scene.add(markerRoot)
+		var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
+			type : 'pattern',
+			patternUrl : THREEx.ArToolkitContext.baseURL + 'marker-robo-2.patt'
+			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.hiro'			
+			//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.kanji'
+		})
+		
+		// build a smoothedControls
+		var smoothedRoot = new THREE.Group()
+		scene.add(smoothedRoot)
+		var smoothedControls = new THREEx.ArSmoothedControls(smoothedRoot, {
+			lerpPosition: 0.4,
+			lerpQuaternion: 0.3,
+			lerpScale: 1,
+		})
+		onRenderFcts.push(function(delta){
+			smoothedControls.update(markerRoot)
+		})
+		
+		var arWorldRoot = smoothedRoot
+		
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		add THE PLANE in the scene
+		//////////////////////////////////////////////////////////////////////////////////		
+		var plane;
+		
+		// model
+		var manager = new THREE.LoadingManager();
+		manager.onStart = function ( url, itemsLoaded, itemsTotal ) {
+			//console.log( 'Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
+		};
+		manager.onLoad = function ( ) {
+			console.log( 'Loading complete!');
+		};
+		manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
+			//console.log( 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
+		};
+		manager.onError = function ( url ) {
+			console.log( 'There was an error loading ' + url );
+		};
+		
+		var loader = new THREE.FBXLoader(manager);
+		loader.load( 'models/samoletche17.fbx', function ( object ) {
 			
-			<script src="src/inflate.min.js"></script>
-			<script src="src/FBXLoader.js"></script>
-			<!-- https://threejs.org/docs/#manual/introduction/WebGL-compatibility-check -->
-			<!-- <script src="src/Detector.js"></script> -->
-			
-			<script>THREEx.ArToolkitContext.baseURL = 'ar/'</script>
-			
-			<title>ROBO</title>
-			<style>
-				html, body {
-					width: 100%;
-					height: 100%;
-					overflow: hidden;
-					position: fixed;
-					margin: 0px;
-					padding: 0px;
-				}
-			</style>
-		</head>
-		<body>
-			<script>
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		Init
-				//////////////////////////////////////////////////////////////////////////////////
-				
-				// init renderer
-				var renderer = new THREE.WebGLRenderer({
-					antialias: true,
-					alpha: true,
-					shadowMap: true
-				});
-				renderer.setClearColor(new THREE.Color('lightgrey'), 0)
-				// renderer.setPixelRatio( 1/2 );
-				renderer.setSize( window.innerWidth, window.innerHeight );
-				renderer.domElement.style.position = 'absolute'
-				renderer.domElement.style.top = '0px'
-				renderer.domElement.style.left = '0px'
-				document.body.appendChild( renderer.domElement );
-				
-				// array of functions for the rendering loop
-				var onRenderFcts= [];
-				
-				// init scene and camera
-				var scene = new THREE.Scene();				
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		Initialize a basic camera
-				//////////////////////////////////////////////////////////////////////////////////
-				
-				// Create a camera
-				// var camera = new THREE.Camera();
-				var camera = new THREE.OrthographicCamera();
-				scene.add(camera);
-				
-				////////////////////////////////////////////////////////////////////////////////
-				//          handle arToolkitSource
-				////////////////////////////////////////////////////////////////////////////////
-				
-				var arToolkitSource = new THREEx.ArToolkitSource({
-					sourceType : 'webcam',
-				})
-				
-				arToolkitSource.init(function onReady(){
-					onResize()
-				})
-				
-				// handle resize
-				window.addEventListener('resize', function(){
-					onResize()
-				})
-				function onResize(){
-					arToolkitSource.onResizeElement()	
-					arToolkitSource.copyElementSizeTo(renderer.domElement)	
-					if( arToolkitContext.arController !== null ){
-						arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
-					}	
-				}
-				
-				////////////////////////////////////////////////////////////////////////////////
-				//          initialize arToolkitContext
-				////////////////////////////////////////////////////////////////////////////////		
-				
-				// create atToolkitContext
-				var arToolkitContext = new THREEx.ArToolkitContext({
-					cameraParametersUrl: THREEx.ArToolkitContext.baseURL + 'camera_para.dat',
-					detectionMode: 'mono',
-					maxDetectionRate: 30,
-					canvasWidth: 80*3,
-					canvasHeight: 60*3,
-				})
-				// initialize it
-				arToolkitContext.init(function onCompleted(){
-					// copy projection matrix to camera
-					camera.projectionMatrix.copy( arToolkitContext.getProjectionMatrix() );
-				})
-				
-				// update artoolkit on every frame
-				onRenderFcts.push(function(){
-					if( arToolkitSource.ready === false )	return
-					
-					arToolkitContext.update( arToolkitSource.domElement )
-				})
-				
-				
-				////////////////////////////////////////////////////////////////////////////////
-				//          Create a ArMarkerControls
-				////////////////////////////////////////////////////////////////////////////////
-				
-				var markerRoot = new THREE.Group
-				scene.add(markerRoot)
-				var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
-					type : 'pattern',
-					patternUrl : THREEx.ArToolkitContext.baseURL + 'marker-robo-2.patt'
-					//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.hiro'			
-					//patternUrl : THREEx.ArToolkitContext.baseURL + 'patt.kanji'
-				})
-				
-				// build a smoothedControls
-				var smoothedRoot = new THREE.Group()
-				scene.add(smoothedRoot)
-				var smoothedControls = new THREEx.ArSmoothedControls(smoothedRoot, {
-					lerpPosition: 0.4,
-					lerpQuaternion: 0.3,
-					lerpScale: 1,
-				})
-				onRenderFcts.push(function(delta){
-					smoothedControls.update(markerRoot)
-				})
-				
-				var arWorldRoot = smoothedRoot
-				
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		add LIGHTS in the scene
-				//////////////////////////////////////////////////////////////////////////////////
-				
-				var light = new THREE.AmbientLight( 0x222222, 4.3 ); // soft white light
-				arWorldRoot.add( light );
-				
-				var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
-				directionalLight.castShadow = true;
-				directionalLight.shadow.camera.near = 0.01
-				directionalLight.position = (5,10,7.5)
-				arWorldRoot.add( directionalLight );
-				
-				light = new THREE.HemisphereLight( 0xffffff, 0x444444 );
-				light.position.set( 0, 200, 0 );
-				arWorldRoot.add( light );
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		add THE PLANE in the scene
-				//////////////////////////////////////////////////////////////////////////////////		
-				
-				// model
-				var manager = new THREE.LoadingManager();
-				manager.onStart = function ( url, itemsLoaded, itemsTotal ) {
-					//console.log( 'Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
-				};
-				manager.onLoad = function ( ) {
-					console.log( 'Loading complete!');
-				};
-				manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
-					//console.log( 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
-				};
-				manager.onError = function ( url ) {
-					console.log( 'There was an error loading ' + url );
-				};
-				
-				var loader = new THREE.FBXLoader(manager);
-				loader.load( 'models/samoletche14.fbx', function ( object ) {
-					
-					// BIND MOVEMENT CONTROLS
-					onRenderFcts.push(function(){
-						if (isTouching) {
-							if (speedX > .5 || speedX < -.5) {
-								object.position.x -= 0.01 * speedX;						
-							}		
-							if (speedY > .5 || speedY < -.5) {
-								object.position.z -= 0.01 * speedY;
-							}		
-							
-							if (Math.abs(object.position.x) > Math.abs(2)) {
-								object.position.x += 0.03 * speedX;
-							}	
-							
-							if (object.position.z > .25 || object.position.z < -4) {
-								object.position.z += 0.03 * speedY;
-							}
-							
-							/*
-							console.log("camera.position.x" + camera.position.x)
-							console.log("arWorldRoot.position.x" + arWorldRoot.position.x)
-							*/
-						}
-					});	
-					
-					object.castShadow = true;
-					
-					object.traverse( function ( child ) {
-						
-						if ( child.isMesh ) {
-							
-							child.castShadow = true;
-							child.receiveShadow = true;
-							console.log(child.name);
-							
-							if (child.name == "Perki")
-							{
-								// ROTATE THE PROPELLER
-								onRenderFcts.push(function(){
-									child.rotation.z += 0.2
-								});		
-								
-							} else if (child.name == "Body") {
-								// BIND ROTATION CONTROLS
-								onRenderFcts.push(function(){
-									if (isTouching) {
-										if (speedX > 0) {
-											object.rotation.z = .25;									
-										} else if (speedX < 0) {
-											object.rotation.z = -.25;
-										}
-										/*
-										if (speedY > 0) {
-											object.rotation.x = -.25;									
-										} else if (speedY < 0) {
-											//object.rotation.x = .25;
-										}*/
-									} else {
-										object.rotation.z = 0;
-										object.rotation.x = 0;
-									}
-								});	
-							} 
-						}
-						
-					} );						
-					
-					arWorldRoot.add( object );
-					
-					// COLLISION DETECTION
-					onRenderFcts.push(function(){
-						for (i = 0; i < mines.length; i++) {
-							if (object.position.distanceTo(mines[i].position) < .4) {
-								mines[i].position.z = mines[i].myStartPosZ;
-								mines[i].mySpeed = Math.random() * 0.05;
-							}
-						}
-					});
-				} );
-				
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		add THE BOMBS in the scene
-				//////////////////////////////////////////////////////////////////////////////////	
-				//var loader1 = new THREE.FBXLoader();
-				var mines = [];
-				loader.load( 'models/mine1.fbx', function ( object ) {									
-					console.log("IN MINA1")
-					object.position.z -=1;
-					
-					for (i = 0; i < 6; i++) {
-						mines.push(object.clone())
-						mines[i].position.z += -4 - Math.random() * 1.25;
-						mines[i].position.x -= -1.5 +i * .65;
-						mines[i].mySpeed = Math.random() * 0.05;
-						mines[i].myRotationX = clamp(Math.random(),0.01,0.04);
-						mines[i].myRotationY = clamp(Math.random(),0.01,0.04);
-						mines[i].myStartPosZ = mines[i].position.z;
-						
-						arWorldRoot.add( mines[i] );
+			// BIND MOVEMENT CONTROLS
+			onRenderFcts.push(function(){
+				if (isTouching) {
+					if (speedX > .5 || speedX < -.5) {
+						object.position.x -= 0.01 * speedX;						
+					}		
+					if (speedY > .5 || speedY < -.5) {
+						object.position.z -= 0.01 * speedY;
 					}		
 					
-					onRenderFcts.push(function(){
-						for (i = 0; i < mines.length; i++) {
-							mines[i].position.z += mines[i].mySpeed;
-							mines[i].rotation.x += mines[i].myRotationX;
-							mines[i].rotation.y += mines[i].myRotationY;
-							
-							if (mines[i].position.z > 1) {
-								mines[i].position.z = mines[i].myStartPosZ;
-								mines[i].mySpeed = Math.random() * 0.05;
-							}
-						}
-					});
-				} );
-				
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		render the whole thing on the page
-				//////////////////////////////////////////////////////////////////////////////////
-				var stats = new Stats();
-				document.body.appendChild( stats.dom );
-				// render the scene
-				onRenderFcts.push(function(){
-					renderer.render( scene, camera );
-					stats.update();
-				})
-				
-				// run the rendering loop
-				var lastTimeMsec= null
-				requestAnimationFrame(function animate(nowMsec){
-					// keep looping
-					requestAnimationFrame( animate );
-					// measure time
-					lastTimeMsec	= lastTimeMsec || nowMsec-1000/60
-					var deltaMsec	= Math.min(200, nowMsec - lastTimeMsec)
-					lastTimeMsec	= nowMsec
-					// call each update function
-					onRenderFcts.forEach(function(onRenderFct){
-						onRenderFct(deltaMsec/1000, nowMsec/1000)
-					})
-				})
-				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		touch detection
-				//////////////////////////////////////////////////////////////////////////////////				
-				var speedX, speedY;
-				var isTouching = false;
-				var startX = 0, startY = 0;		
-				var currentX = 0, currentY = 0;
-				
-				window.addEventListener('touchstart', function(e) {
-					isTouching = true;
-					startX = e.touches[0].clientX;
-					currentX = startX;
-					startY = e.touches[0].clientY;
-					currentY = startY;
-				});
-				
-				window.addEventListener('touchmove', function(e) {
-					currentX = e.changedTouches[0].clientX;		    
-					speedX = startX - currentX;
-					speedX = clamp(speedX,-10,10);
-					startX = currentX;
+					if (Math.abs(object.position.x) > Math.abs(2)) {
+						object.position.x += 0.03 * speedX;
+					}	
 					
-					currentY = e.changedTouches[0].clientY;		    
-					speedY = startY - currentY;
-					speedY = clamp(speedY,-10,10);
-					startY = currentY;
-				});
+					if (object.position.z > .25 || object.position.z < -4) {
+						object.position.z += 0.03 * speedY;
+					}
+					
+					/*
+					console.log("camera.position.x" + camera.position.x)
+					console.log("arWorldRoot.position.x" + arWorldRoot.position.x)
+					*/
+				}
+			});	
+			
+			object.castShadow = true;
+			
+			object.traverse( function ( child ) {
 				
-				window.addEventListener('touchend', function() {
-					isTouching = false;
-				});
+				if ( child.isMesh ) {
+					
+					child.castShadow = true;
+					child.receiveShadow = true;
+					console.log(child.name);
+					
+					if (child.name == "Perki")
+					{
+						// ROTATE THE PROPELLER
+						onRenderFcts.push(function(){
+							child.rotation.z += 0.2
+						});		
+						
+					} else if (child.name == "Body") {
+						// BIND ROTATION CONTROLS
+						onRenderFcts.push(function(){
+							if (isTouching) {
+								if (speedX > 0) {
+									object.rotation.z = .25;									
+								} else if (speedX < 0) {
+									object.rotation.z = -.25;
+								}
+								
+								if (speedY > 0) {
+									//object.rotation.x = -.25;									
+								} else if (speedY < 0) {
+									object.rotation.x += .25;
+								}
+							} else {
+								object.rotation.z = 0;
+								object.rotation.x = 0;
+							}
+						});	
+					} 
+				}
 				
-				//////////////////////////////////////////////////////////////////////////////////
-				//		helper functions
-				//////////////////////////////////////////////////////////////////////////////////				
-				function clamp(num, min, max) {
-					return num <= min ? min : num >= max ? max : num;
-				}				
+			} );						
+			
+			plane = object;
+			arWorldRoot.add( plane );
+			console.log("plane postition:")
+			console.log(plane.position)
+			
+			// COLLISION DETECTION
+			onRenderFcts.push(function(){
+				for (i = 0; i < parachutes.length; i++) {
+					if (object.position.distanceTo(parachutes[i].position) < .4) {
+						parachutes[i].position.z = parachutes[i].myStartPosZ;
+						parachutes[i].mySpeed = Math.random() * 0.05;
+					}
+				}
+			});
+		} );
+		
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		add THE BOMBS in the scene
+		//////////////////////////////////////////////////////////////////////////////////	
+		//var loader1 = new THREE.FBXLoader();
+		var parachutes = [];
+		loader.load( 'models/parashut2.fbx', function ( object ) {									
+			console.log("IN MINA1")
+			object.position.z -=1;
+			
+			for (i = 0; i < 6; i++) {
+				parachutes.push(object.clone())
+				parachutes[i].position.z += -4 - Math.random() * 1.25;
+				parachutes[i].position.x -= -1.5 +i * .65;
+				parachutes[i].mySpeed = Math.random() * 0.05;
+				parachutes[i].myRotationX = clamp(Math.random(),0.01,0.04);
+				parachutes[i].myRotationY = clamp(Math.random(),0.01,0.04);
+				parachutes[i].myStartPosZ = parachutes[i].position.z;
 				
-			</script>
-		</body>
-		</html>
+				arWorldRoot.add( parachutes[i] );
+			}		
+			
+			onRenderFcts.push(function(){
+				for (i = 0; i < parachutes.length; i++) {
+					parachutes[i].position.z += parachutes[i].mySpeed;
+					// parachutes[i].rotation.x += parachutes[i].myRotationX;
+					parachutes[i].rotation.y += parachutes[i].myRotationY;
+					
+					if (parachutes[i].position.z > 1) {
+						parachutes[i].position.z = parachutes[i].myStartPosZ;
+						parachutes[i].mySpeed = Math.random() * 0.05;
+					}
+				}
+			});
+		} );
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		add LIGHTS in the scene
+		//////////////////////////////////////////////////////////////////////////////////
+		
+		// var light = new THREE.AmbientLight( 0x222222, 4.3 ); // soft white light
+		// arWorldRoot.add( light );
+		
+		/*
+		var lightAnchor = new THREE.Object3D();
+		lightAnchor.position.x = -35;
+		scene.add(lightAnchor);
+		var directionalLight = new THREE.DirectionalLight( 0xffffff, 1.5 );
+		directionalLight.castShadow = true;
+		directionalLight.shadow.camera.near = 0.01
+		directionalLight.target = lightAnchor;
+		scene.add( directionalLight );
+		*/
+		
+		var light, materials;
+		scene.add( new THREE.AmbientLight( 0x666666 ) );
+		light = new THREE.DirectionalLight( 0xdfebff, 1 );
+		light.position.set( 50, 200, 100 );
+		light.position.multiplyScalar( 1.3 );
+		light.castShadow = true;
+		light.shadow.mapSize.width = 1024;
+		light.shadow.mapSize.height = 1024;
+		var d = 300;
+		light.shadow.camera.left = - d;
+		light.shadow.camera.right = d;
+		light.shadow.camera.top = d;
+		light.shadow.camera.bottom = - d;
+		light.shadow.camera.far = 1000;
+		scene.add( light );
+		
+		/*
+		var planeGeometry = new THREE.PlaneGeometry( 2000, 2000 );
+		planeGeometry.rotateX( - Math.PI / 2 );
+		
+		var planeMaterial = new THREE.ShadowMaterial();
+		planeMaterial.opacity = 0.2;
+		
+		var plane = new THREE.Mesh( planeGeometry, planeMaterial );
+		plane.position.y = -200;
+		plane.receiveShadow = true;
+		arWorldRoot.add( plane );
+		*/
+		// light = new THREE.HemisphereLight( 0xffffff, 0x444444 );
+		// light.position.set( 0, 200, 0 );
+		// arWorldRoot.add( light );
+		
+		
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		render the whole thing on the page
+		//////////////////////////////////////////////////////////////////////////////////
+		var stats = new Stats();
+		document.body.appendChild( stats.dom );
+		// render the scene
+		onRenderFcts.push(function(){
+			renderer.render( scene, camera );
+			stats.update();
+		})
+		
+		// run the rendering loop
+		var lastTimeMsec= null
+		requestAnimationFrame(function animate(nowMsec){
+			// keep looping
+			requestAnimationFrame( animate );
+			// measure time
+			lastTimeMsec	= lastTimeMsec || nowMsec-1000/60
+			var deltaMsec	= Math.min(200, nowMsec - lastTimeMsec)
+			lastTimeMsec	= nowMsec
+			// call each update function
+			onRenderFcts.forEach(function(onRenderFct){
+				onRenderFct(deltaMsec/1000, nowMsec/1000)
+			})
+		})
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		touch detection
+		//////////////////////////////////////////////////////////////////////////////////				
+		var speedX, speedY;
+		var isTouching = false;
+		var startX = 0, startY = 0;		
+		var currentX = 0, currentY = 0;
+		
+		window.addEventListener('touchstart', function(e) {
+			isTouching = true;
+			startX = e.touches[0].clientX;
+			currentX = startX;
+			startY = e.touches[0].clientY;
+			currentY = startY;
+		});
+		
+		window.addEventListener('touchmove', function(e) {
+			currentX = e.changedTouches[0].clientX;		    
+			speedX = startX - currentX;
+			speedX = clamp(speedX,-10,10);
+			startX = currentX;
+			
+			currentY = e.changedTouches[0].clientY;		    
+			speedY = startY - currentY;
+			speedY = clamp(speedY,-10,10);
+			startY = currentY;
+		});
+		
+		window.addEventListener('touchend', function() {
+			isTouching = false;
+		});
+		
+		window.onload = function() {
+			document.addEventListener('keydown', function(e) {
+				
+				isTouching = true;
+				
+				if (e.keyCode == '38') {
+					speedY = 1;
+				}
+				if (e.keyCode == '40') {
+					speedY = -1;
+				}
+				if (e.keyCode == '37') {
+					speedX = 1;
+				}
+				if (e.keyCode == '39') {
+					speedX = -1;
+				}
+			}, false);
+			
+			document.addEventListener('keyup', function(e) {
+				
+				isTouching = false;
+				speedX = 0;
+				speedY = 0;
+			}, false);
+			
+		}
+		
+		//////////////////////////////////////////////////////////////////////////////////
+		//		helper functions
+		//////////////////////////////////////////////////////////////////////////////////				
+		function clamp(num, min, max) {
+			return num <= min ? min : num >= max ? max : num;
+		}				
+		
+	</script>
+</body>
+</html>
